@@ -1,0 +1,14 @@
+﻿  stdafx.cpp
+  Probability.cpp
+  OptionPricer.cpp
+c:\users\hansa\documents\computationalfinance-master\computational finance\optionpricer.cpp(40): warning C4018: '<': signed/unsigned mismatch
+  Option.cpp
+  ComputationalFinance.cpp
+c:\users\hansa\documents\computationalfinance-master\computational finance\computationalfinance.cpp(50): warning C4101: 'results': unreferenced local variable
+c:\users\hansa\documents\computationalfinance-master\computational finance\computationalfinance.cpp(50): warning C4101: 'var': unreferenced local variable
+  Generating Code...
+c:\users\hansa\documents\computationalfinance-master\computational finance\optionpricer.cpp(110): warning C4172: returning address of local variable or temporary: results
+c:\users\hansa\documents\computationalfinance-master\computational finance\optionpricer.cpp(253): warning C4172: returning address of local variable or temporary: results
+c:\users\hansa\documents\computationalfinance-master\computational finance\optionpricer.cpp(312): warning C4172: returning address of local variable or temporary: results
+  ComputationalFinance.vcxproj -> C:\Users\Hansa\source\repos\ComputationalFinance\Debug\ComputationalFinance.exe
+  ComputationalFinance.vcxproj -> C:\Users\Hansa\source\repos\ComputationalFinance\Debug\ComputationalFinance.pdb (Partial PDB)
