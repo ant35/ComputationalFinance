@@ -2,9 +2,9 @@
 #include "MilsteinMethod.h"
 
 
-MilsteinMethod::MilsteinMethod(double a, double b, double bprime, double dw, double Mesh)
+MilsteinMethod::MilsteinMethod()
 {
-	setA(a); setB(b); setBprime(bprime); setdW(dw); setMesh(Mesh);
+	
 }
 
 
@@ -13,6 +13,7 @@ MilsteinMethod::~MilsteinMethod()
 }
 
 double MilsteinMethod::OneStepAhead(double previous) {
-	return previous*(1 + A*mesh + B*dW+ 0.5*B*Bprime*(dW*dW - mesh));
+	return previous + aFunc(previous)*mesh + bFunc(previous)*dW +
+		0.5*bFunc(previous)*bPrimeFunc(previous)*(dW*dW - mesh);
 
 }

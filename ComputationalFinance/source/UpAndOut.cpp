@@ -42,6 +42,6 @@ double UpAndOut::ClosedForm() {
 }
 
 bool UpAndOut::KnockedOut(double spot) {
-	if (spot >= up) return true;
-	return false;
+	if (spot >= up) return true; //spot crossed barrier
+	return false; //spot is still under barrier
 }
