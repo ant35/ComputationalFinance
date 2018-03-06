@@ -3,60 +3,51 @@
 #define OPTION_H
 
 #include "Asset.h"
-#include <string>
-using std::cout;
-using std::endl;
 
 class Option :
 	public Asset
 {
 public:
-	Option();
-	Option(double volatility ,double strike_price, double time_till_maturity_years, string type, string contract);
-	Option(double volatility, double strike_price, double time_till_maturity_years, string type, string contract,
-		double interest, double div_yield, double starting_price);
-	~Option();
-	void print() {
-		cout << "Option Properties ... " << endl << "Starting Price: " << s_naught << endl << " Type: " << option_type <<"/"<<contract_type<< endl << 
-			"Volatility: " << sigma << endl << "Strike: " << strike << endl << "Maturity: " << maturity << " year(s) " << endl << 
-			"Interest Rate: " << interest_rate << endl << "Dividend Yield: " << dividend_yield << std::endl;
+	
+	void print() = 0;
+	/*Defines conditions for which the option is knocked out (if any).*/
+	virtual bool KnockedOut(double spot) = 0;
+	
+	double Payoff(double spot) {	
+		if (option_type == "call") return max(spot - strike, 0.0);
+		else if (option_type == "put") return max(strike - spot, 0.0);
+		else cout << "UNDEFINED OPTION TYPE: PLAINVANILLA: " << option_type << endl;
 
+		return -1.0;
+	};
+
+	virtual double ClosedForm() = 0;
+	inline void setMaturity(double mat) { maturity = mat; };
+	inline void setOptionType(string callOrPut) { option_type = callOrPut; };
+	inline void setStrike(double Strike) { strike = Strike; };
+	inline void setVolatility(double volatility) { sigma = volatility; };
+	
+	template <class T>
+	double max(T v1, T v2) {
+		if (v1 >= v2) return v1;
+		else return v2;
+	}
+	template <class T>
+	double min(T v1, T v2) {
+		if (v1 <= v2) return v1;
+		else return v2;
 	}
 
-	/*This overload implements the payoff function of the option based on its contract.*/
-	double operator()(double final_price);
-
-	/*Payoff for plain vanilla option*/
-	double plain_vanilla(double final_price);
-
-	/*Set lower barrier on barrier option.*/
-	inline void setLowerBarrier(double l) { low = l; }
-
-	/*Set upper barrier on barrier option.*/
-	inline void setUpperBarrier(double u) { up = u; }
-
 protected:
-	/*Volatility of the asset.*/
+	/*Volatility of the underlying.*/
 	double sigma;
-
-	/*Strike price for the asset.*/
+	/*Strike price for the option.*/
 	double strike;
-
-	/*Lower barrier for barrier options*/
-	double low;
-	
-	/*Time to maturity for the asset (years).*/
+	/*Time to maturity for the option (years).*/
 	double maturity;
-
 	/*The type of option ("call" or "put").*/
 	string option_type;
 
-	/*Will define the payoff structure for the contract.*/
-	string contract_type;
-	
-	/*Upper barrier for barrier options*/
-	double up;
-	
 	friend class OptionPricer;
 };
 #endif
