@@ -18,117 +18,80 @@ using std::ofstream;
 using namespace std::chrono;
 
 #include "Probability.h"
+#include "PlainVanilla.h"
+#include "UpAndOut.h"
 #include "OptionPricer.h"
 #include "LEcuyer.h"
 #include "ParkMiller.h"
 #include "Fishman.h"
 #include "BoxMullerMarsaglia.h"
+#include "EulerMaruyama.h"
 
 
-inline double Euler_Method(double previous, double mesh, double A, double increment, double sigma);
-inline double log_Euler_Method(double previous, double mesh, double A, double increment, double sigma);
-inline double Milstein_Method(double previous, double mesh, double A, double increment, double sigma);
 void record2bData(unsigned long iterations);
-void testMethod(int*, OptionPricer, Option, string, double(*func)(double, double, double, double, double), double = -1);
+void testMethod(int*, OptionPricer, Option *, string, StochasticNumericalMethod * func, double = -1);
 
+double afunc(double prev) {
+	return prev*0.05;
+}
+double bfunc(double prev) {
+	return prev*0.3;
+}
 int main()
 {
-	record2bData(1000);
+	//record2bData(1000);
 	
 	double volatility, strike_price, time_till_maturity_years;
 	string type, contract;
 	double interest, div_yield, starting_price;
-
+	
 	volatility = 0.3;
 	strike_price = 110;
 	time_till_maturity_years = 1.0;
 	type = "call";
-	//contract = "up and out";
-	contract = "plain vanilla";
 	interest = 0.05;
 	div_yield = 0.0;
 	starting_price = 100.0;
+	UpAndOut upandout;
+	Option * option1 = &upandout;
+	option1->setVolatility(volatility);
+	option1->setStrike(strike_price);
+	option1->setMaturity(time_till_maturity_years);
+	option1->setOptionType(type);
+	option1->setInterestRate(interest);
+	option1->setDividend(div_yield);
+	option1->setS0(starting_price);
 
-	Option option1(volatility, strike_price, time_till_maturity_years, type, contract, interest, div_yield, starting_price);
-	option1.setUpperBarrier(120);
-	Option options[] = { option1 };
-
-	int size = 1; //of option array
-
+	upandout.setUpperBarrier(120);
+	double mesh = 1.0 / 252;
 	OptionPricer pricer;
-	pricer.setMesh(1.0 / 365);
+	pricer.setMesh(mesh);
 	pricer.setPaths(10000);
 	double truth = 0;
 	
 	Generator *ecuyer = new LEcuyer;
-	Generator *parkmiller = new ParkMiller;
-	Generator *e2 = new LEcuyer;
-	Generator *p2 = new ParkMiller;
-	Generator *fishmanEcuyer = new Fishman(e2);
-	Generator *fishmanParkmiller = new Fishman(p2);
-	Generator *p3 = new ParkMiller;
-	Generator *box = new BoxMullerMarsaglia(p3);
-	pricer.setPaths(100000);
+	StochasticNumericalMethod * snm = new EulerMaruyama;
+	snm->setMesh(mesh);
+	snm->setAFunc(afunc);
+	snm->setBFunc(bfunc);
+
 	/*1a*/
-	cout << "100000 paths: " << endl;
-	cout << "BS = " << pricer.black_Scholes(option1) << endl;
+	truth = upandout.ClosedForm();
+	cout << "10000 paths: " << endl;
+	cout << "BS = " << truth << endl;
 	pricer.setGenerator(ecuyer);
-	cout << "MC with L'Ecuyer = " << pricer.analytical_solution(option1) << endl;
-	pricer.setGenerator(parkmiller);
-	cout << "MC with Park Miller = " << pricer.analytical_solution(option1) << endl;
-	
-
-	/*1b*/
-	pricer.setPaths(100000);
-	parkmiller->RestartSeed();
-	cout << "\n100000 paths: " << endl;
-	pricer.setGenerator(parkmiller);
-	cout << "MC with inverse normal (park miller) = " << pricer.analytical_solution(option1) << endl;
-	pricer.setGenerator(box);
-	cout << "MC with Box Muller = " << pricer.analytical_solution(option1) << endl;
-	pricer.setGenerator(fishmanParkmiller);
-	cout << "MC with Fisherman normal generator = " << pricer.analytical_solution(option1) << endl;
-
-	
+	cout << "MC with L'Ecuyer = " << pricer.numerical_Method(option1, snm, truth)[0] << endl;
 	
 	return 0;
 
-	/*2*/
 
 }
 
-/*
-Generates next iteration in a euler method approximation to the SDE dS(t) = S(t)((r-d)dt + sigma*dW(t)).
-@param previous Last iteration value
-@param mesh Step size
-@param A := a(X(t))= interest rate - dividend yield
-@param increment sqrt(t_{i+1} - t_i) * Z
-*/
-double Euler_Method(double previous, double mesh, double A, double increment, double sigma) {
-	return previous*(1 + A*mesh + sigma*increment); // apply Euler's method
-}
 
-/*
-Generates next iteration in a euler method approximation to a stochastic differential equation.
-@param previous Last iteration value
-@param mesh Step size
-@param A := a(X(t))= interest rate - dividend yield
-@param increment sqrt(t_{i+1} - t_i) * Z
-*/
-double log_Euler_Method(double previous, double mesh, double A, double increment, double sigma) {
-	return previous + (A - 0.5*sigma*sigma)*mesh + sigma*increment; // apply Euler's method	
-}
 
-/*
-Generates next iteration in a Milstein method approximation to a stochastic differential equation.
-@param previous Last iteration value
-@param mesh Step size
-@param A := a(X(t)) = interest rate - dividend yield
-@param increment sqrt(t_{i+1} - t_i) * Z
-*/
-double Milstein_Method(double previous, double mesh, double A, double increment, double sigma) {
-	return previous*(1 + A*mesh + sigma*increment + 0.5*sigma*sigma*(increment*increment - mesh));
-}
+
+
+
 
 /*
 *Records the output for Box Muller, inverse transform, and Fishman
@@ -162,7 +125,7 @@ void record2bData(unsigned long iterations) {
 	}
 	file.close();
 }
-void testMethod(int* paths, OptionPricer pricer, Option OPTION, string method, double(*func)(double, double, double, double, double), double truth) {
+void testMethod(int* paths, OptionPricer pricer, Option * OPTION, string method, StochasticNumericalMethod * func, double truth) {
 	double *results, curr, var, UB, LB, runningSum = 0, avg_err;
 	for (unsigned i = 0; i < 4; ++i) {
 		cout << "Paths: " << paths[i] << "->";
