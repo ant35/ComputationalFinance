@@ -22,32 +22,25 @@ public:
 	double analytical_solution(Option * opt);
 	/*Provides antithetic MC adaptation to OptionPricer::numerical_Method. Will possibly deprecate numerical_Method in future,
 	so I made it into its own function.*/
-	double* antithetic_numerical_Method(Option * opt, StochasticNumericalMethod * snm, double truth = -1.0);
+	double* antithetic_numerical_Method(Option * opt, StochasticNumericalMethod * snm);
 	double* control_variate(Option * opt, StochasticNumericalMethod * snm, double truth = -1);
 
 	/*
 		This function generates a Brownian motion W and feeds it into an iterative numerical method for approximating an SDE.
 
 		@param Option object to refer to option being worked on
-		@param method Pointer to a function that implements a numerical method
-
-		To use this function it is necessary to implement a function handle for the numerical method your using in the .cpp
-		file.
+		@param snm Pointer to a StochasticNumericalMethod object that implements a numerical method
 
 	*/
-	double* numerical_Method(Option * opt, StochasticNumericalMethod * snm,double truth = -1);
+	double* numerical_Method(Option * opt, StochasticNumericalMethod * snm);
 	
 	/*Set number of paths to be generated in MC simulation.*/
 	inline void setPaths(long p) { paths = p; };
-	inline void setMesh(double m) { mesh = m; };
+	inline void setMesh(double m) { mesh = m; setRootMesh(); };
 	inline void setGenerator(Generator * generator) { rng = generator; };
-	/*
-	Calculates closed form solution of up and out barrier option, assuming it doesn't cross the barrier.
-	The formula for the closed form solution is taken from Shreve II (7.3.19).
-	@param Option object to represent the derivative*/
-	double up_and_out_closed_form(Option *, double = -1, double = -1);
+
 private:
-	inline void setRootMesh(double rm) { root_mesh = rm; }
+	inline void setRootMesh() { root_mesh = sqrt(mesh); }
 	/*Number of paths to be generated in MC simulation.*/
 	long paths;
 	/*Mesh size to partition in numerical approximation.*/
