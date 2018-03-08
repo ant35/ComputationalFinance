@@ -14,7 +14,7 @@ using std::cout;
 OptionPricer::OptionPricer() {
 	setPaths(10000);
 	setMesh(1.0 / 252);
-	setRootMesh(sqrt(1.0 / 252));
+	setRootMesh();
 
 };
 /*
@@ -24,7 +24,7 @@ OptionPricer::OptionPricer() {
 OptionPricer::OptionPricer(long number_of_paths, double mesh_size) {
 	setPaths(number_of_paths);
 	setMesh(mesh_size);
-	setRootMesh(sqrt(mesh_size));
+	setRootMesh();
 }
 
 OptionPricer::~OptionPricer()
@@ -48,23 +48,23 @@ double OptionPricer::analytical_solution(Option * opt) {
 	return C*scale * sum;
 }
 
-double* OptionPricer::antithetic_numerical_Method(Option * opt,StochasticNumericalMethod * snm, double truth) {
+double* OptionPricer::antithetic_numerical_Method(Option * opt,StochasticNumericalMethod * snm) {
 	double S_i = opt->s0, S_i_t = opt->s0; // S_i is asset price, S_i_t is the antithetic path
 	double B = exp(-opt->interest_rate*opt->maturity); //e^(-rT)
 	double bound = opt->maturity / mesh; //T/h=N
-	double v1=0, v2=0, vary1 =0,vary2=0, covy1y2 = 0, Z =0.0;
+	double v1=0, v2=0, Z =0.0;
 	bool stop1 = false, stop2 = false;
 
 	int count = 0; //for the while loop
-	double sum = 0, scale = 0.5 / paths;
+	double sum = 0, squareSum = 0, scale = 0.5 / paths, varscale = 0.5 / (paths - 1);
 
 	while (count < paths) {
 		for (unsigned long i = 0; i < bound; ++i) {
 			Z = rng->GetOneGaussianRandom();
 				
-			snm->setdW(sqrt(mesh)*Z);
+			snm->setdW(root_mesh*Z);
 			if (!stop1) S_i = snm->OneStepAhead(S_i); //apply numerical method
-			snm->setdW(-sqrt(mesh)*Z); //set for opposite path
+			snm->setdW(-root_mesh*Z); //set for antithetic path
 			if (!stop2) S_i_t = snm->OneStepAhead(S_i_t); 
 				
 			if (opt->KnockedOut(S_i)) { stop1 = true; S_i = opt->strike; };  //underlying price crossed barrier, option expires
@@ -79,19 +79,22 @@ double* OptionPricer::antithetic_numerical_Method(Option * opt,StochasticNumeric
 	
 		v1 = opt->Payoff(S_i);
 		v2 = opt->Payoff(S_i_t);
-		vary1 += (v1 - truth)*(v1 - truth);
-		vary2 += (v2 - truth)*(v2 - truth);
-		covy1y2 += (v1 - truth)*(v2 - truth);
 		sum += v1 + v2;
+		squareSum += v1*(v1 + v2);
+
 		v1 = 0;
 		v2 = 0;
 		S_i = opt->s0;
 		S_i_t = opt->s0;
 		count++;
 	}
-	double results[2];
-	results[0] = B*scale*sum;
-	results[1] = (1.0 / (paths - 1))*0.25*(vary1 + vary2 + 2*covy1y2);
+
+	sum *= B;
+	squareSum *= B*B;
+	double yhat = scale*sum;
+	double * results = new double[2];
+	results[0] = yhat;
+	results[1] = varscale*(squareSum + yhat*sum + (2 * paths - 2)*yhat);
 	return results;
 };
 
@@ -110,7 +113,7 @@ double* OptionPricer::control_variate(Option * opt, StochasticNumericalMethod * 
 	int count = 0;
 	while (count < 1000) {		
 		for (unsigned long i = 0; i < bound; ++i) {
-			snm->setdW(sqrt(mesh)*rng->GetOneGaussianRandom());
+			snm->setdW(root_mesh*rng->GetOneGaussianRandom());
 			S_i = snm->OneStepAhead(S_i); //apply numerical method
 			if (opt->KnockedOut(S_i)) break; //check if option is knocked out at current spot
 		}
@@ -152,7 +155,7 @@ double* OptionPricer::control_variate(Option * opt, StochasticNumericalMethod * 
 	while (count < paths) {
 		for (unsigned long i = 0; i < bound; ++i) {
 			Z = rng->GetOneGaussianRandom();
-			snm->setdW(sqrt(mesh)*Z);
+			snm->setdW(root_mesh*Z);
 			S_i = snm->OneStepAhead(S_i); //apply numerical method
 			if (opt->KnockedOut(S_i)) break; //check if option is knocked out at current spot
 				
@@ -179,31 +182,32 @@ double* OptionPricer::control_variate(Option * opt, StochasticNumericalMethod * 
 };
 
 
-double* OptionPricer::numerical_Method(Option * opt, StochasticNumericalMethod * snm, double truth) {
+double* OptionPricer::numerical_Method(Option * opt, StochasticNumericalMethod * snm) {
 	int count = 0; //for the while loop
-	double sum = 0, err_sum = 0.0; //running sums
+	double sum = 0, squareSum = 0.0; //running sums
 	double S_i = opt->s0, bound = opt->maturity / mesh, v1 = 0, e = 0;
-	double B=exp(-opt->interest_rate*opt->maturity),scale = 1.0/paths;
+	double B=exp(-opt->interest_rate*opt->maturity),scale = 1.0/paths, varScale = 1.0/(paths-1);
 
 	while (count < paths) {
 		for (unsigned long i = 0; i < bound; ++i) {
-			snm->setdW(sqrt(mesh)*rng->GetOneGaussianRandom());
+			snm->setdW(root_mesh*rng->GetOneGaussianRandom());
 			S_i = snm->OneStepAhead(S_i); //get S(T) estimate
 			if (opt->KnockedOut(S_i)) { S_i = opt->strike; break; }; //check if knocked out
 		}
 		v1 = opt->Payoff(S_i);
 		sum += v1;
-			
-		e = v1 - truth;
-		err_sum = e*e;
-				
+		squareSum += v1*v1;
 		S_i = opt->s0;
 		count++;
 	}
-	double results[2];
-	results[0] = B*scale*sum;
-	results[1] = (1.0 / (paths - 1))*err_sum;
-
+	double chat;
+	sum *= B;
+	squareSum *= B*B;
+	chat = scale*sum;
+	//Return mean and variance
+	double * results = new double[2];
+	results[0] = chat;
+	results[1] = varScale*(squareSum + (paths - 2)*chat*chat);
 	return results;
 }
 
