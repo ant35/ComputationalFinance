@@ -29,10 +29,9 @@ using namespace std::chrono;
 
 
 void record2bData(unsigned long iterations);
-void testMethod(int*, OptionPricer, Option *, string, StochasticNumericalMethod * func, double = -1);
-
+void confidenceInterval(double mean, double variance);
 double afunc(double prev) {
-	return prev*0.05;
+	return prev*(0.05-0.02);
 }
 double bfunc(double prev) {
 	return prev*0.3;
@@ -50,8 +49,9 @@ int main()
 	time_till_maturity_years = 1.0;
 	type = "call";
 	interest = 0.05;
-	div_yield = 0.0;
+	div_yield = 0.02;
 	starting_price = 100.0;
+	
 	UpAndOut upandout;
 	Option * option1 = &upandout;
 	option1->setVolatility(volatility);
@@ -63,10 +63,10 @@ int main()
 	option1->setS0(starting_price);
 
 	upandout.setUpperBarrier(120);
-	double mesh = 1.0 / 252;
+	double mesh = 1.0 / 365, paths = 100000;
 	OptionPricer pricer;
-	pricer.setMesh(mesh);
-	pricer.setPaths(10000);
+	pricer.setMesh(mesh); 
+	pricer.setPaths(paths);
 	double truth = 0;
 	
 	Generator *ecuyer = new LEcuyer;
@@ -75,12 +75,29 @@ int main()
 	snm->setAFunc(afunc);
 	snm->setBFunc(bfunc);
 
-	/*1a*/
 	truth = upandout.ClosedForm();
-	cout << "10000 paths: " << endl;
+	cout << paths <<" paths: " << endl;
 	cout << "BS = " << truth << endl;
 	pricer.setGenerator(ecuyer);
-	cout << "MC with L'Ecuyer = " << pricer.numerical_Method(option1, snm, truth)[0] << endl;
+	double * results = pricer.numerical_Method(option1, snm);
+	double m = results[0], v = results[1];
+	cout << "MC with L'Ecuyer = " << m << endl;
+	cout << "Variance = " << v << endl;
+	confidenceInterval(m, v); //95 % normal distribution
+	delete[] results;
+	
+	paths = paths/2.0;
+	pricer.setPaths(paths);
+	cout << endl;
+	cout << paths << " paths: " << endl;
+	ecuyer->RestartSeed();
+    results = pricer.antithetic_numerical_Method(option1, snm);
+	m = results[0], v = results[1];
+	cout << "AV with L'Ecuyer = " << m << endl;
+	cout << "Variance = " << v << endl;
+	confidenceInterval(m, v); //95 % normal distribution
+	delete[] results;
+	results = NULL;
 	
 	return 0;
 
@@ -125,34 +142,7 @@ void record2bData(unsigned long iterations) {
 	}
 	file.close();
 }
-void testMethod(int* paths, OptionPricer pricer, Option * OPTION, string method, StochasticNumericalMethod * func, double truth) {
-	double *results, curr, var, UB, LB, runningSum = 0, avg_err;
-	for (unsigned i = 0; i < 4; ++i) {
-		cout << "Paths: " << paths[i] << "->";
-		pricer.setPaths(paths[i]);
 
-		//Start function
-		auto start = std::chrono::system_clock::now();
-
-		if (method == "Antithetic Euler Method") results = pricer.antithetic_numerical_Method(OPTION, func, truth);
-		else if (method == "Control Variate Method") results = pricer.control_variate(OPTION, func, truth);
-		else results = pricer.numerical_Method(OPTION, func, truth);
-		curr = results[0]; //mean
-		var = results[1]; //variance
-
-						  //Function End
-		auto end = std::chrono::system_clock::now();
-
-		//Calculate runtime
-		std::chrono::duration<double> duration = end - start;
-		UB = curr + 1.96*sqrt(var / paths[i]);
-		LB = curr - 1.96*sqrt(var / paths[i]);
-		cout << "Option price using " << method << "=" << curr << "; CI=[" << LB << "," << UB << "]" <<
-			endl << "variance = " << setprecision(10) << var << ", runtime = " << duration.count() << " seconds" << endl;
-		runningSum += var;
-	}
-	avg_err = (1 / 3.0)*runningSum;
-	cout << "Average Variance = " << avg_err << endl;
-	runningSum = 0;
-	cout << endl;
+void confidenceInterval(double mean, double variance) {
+	cout << "(" << mean - 1.96*sqrt(variance) / 100.0 << "," << mean + 1.96*sqrt(variance) / 100.0 << ")" << endl;
 }
