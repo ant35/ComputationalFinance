@@ -31,21 +31,50 @@ OptionPricer::~OptionPricer()
 {
 }
 
-double OptionPricer::analytical_solution(Option * opt) {
+double * OptionPricer::analytical_solution(Option * opt) {
 	double scale = 1.0 / paths;
 	double A = opt->s0*exp(opt->interest_rate - opt->dividend_yield -0.5*opt->sigma*opt->sigma);
 	double B = opt->sigma*sqrt(opt->maturity);
 	double C = exp(-opt->interest_rate*opt->maturity);
-	double sum = 0;
-	double S_jT = 0;
+	double sum = 0, squareSum = 0, varScale = 1.0/(paths-1);
+	double S_jT = 0, v1 =0;
 
 	
 	for (unsigned long j = 0; j < paths; ++j) {
 		S_jT = A*exp(B*rng->GetOneGaussianRandom());
 		sum += opt->Payoff(S_jT);
+		squareSum += v1*v1;
 	}
+	double chat;
+	sum *= C;
+	squareSum *= C*C;
+	chat = scale*sum;
+	//Return mean and variance
+	double * results = new double[2];
+	results[0] = chat;
+	results[1] = varScale*(squareSum + (paths - 2)*chat*chat);
+	return results;
+}
+double OptionPricer::antithetic_analytical_solution(Option * opt) {
+	double scale = 0.5 / paths;
+	double A = opt->s0*exp(opt->interest_rate - opt->dividend_yield - 0.5*opt->sigma*opt->sigma);
+	double B = opt->sigma*sqrt(opt->maturity);
+	double C = exp(-opt->interest_rate*opt->maturity);
+	double sum = 0;
+	double S_jT = 0, S_an = 0, v1 = 0, Z = 0;
 
-	return C*scale * sum;
+
+	for (unsigned long j = 0; j < paths; ++j) {
+		Z = rng->GetOneGaussianRandom();
+		S_jT = A*exp(B*Z);
+		S_an = A*exp(-B*Z);
+		sum += opt->Payoff(S_jT) + opt->Payoff(S_an);
+	}
+	double chat;
+	sum *= C;
+	chat = scale*sum;
+	
+	return chat;
 }
 
 double* OptionPricer::antithetic_numerical_Method(Option * opt,StochasticNumericalMethod * snm) {
