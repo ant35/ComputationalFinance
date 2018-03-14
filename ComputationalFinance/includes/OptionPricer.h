@@ -19,7 +19,8 @@ public:
 	@param opt Option to be analyzed
 
 	*/
-	double analytical_solution(Option * opt);
+	double * analytical_solution(Option * opt);
+	double antithetic_analytical_solution(Option * opt);
 	/*Provides antithetic MC adaptation to OptionPricer::numerical_Method. Will possibly deprecate numerical_Method in future,
 	so I made it into its own function.*/
 	double* antithetic_numerical_Method(Option * opt, StochasticNumericalMethod * snm);
@@ -33,7 +34,6 @@ public:
 
 	*/
 	double* numerical_Method(Option * opt, StochasticNumericalMethod * snm);
-	
 	/*Set number of paths to be generated in MC simulation.*/
 	inline void setPaths(long p) { paths = p; };
 	inline void setMesh(double m) { mesh = m; setRootMesh(); };
